@@ -45,7 +45,7 @@ def generate_launch_description() -> LaunchDescription:
     # camera node
     composable_nodes = [
         ComposableNode(
-            package='camera_ros',
+            package='andino_camera',
             plugin='camera::CameraNode',
             parameters=[{
                 "camera": camera_param,

@@ -48,12 +48,12 @@ def generate_launch_description():
     return LaunchDescription([
         intrinsic_params_file,
         Node(
-            package='camera_ros',
+            package='andino_camera',
             executable='camera_node',
             name='camera_node',
             output='screen',
             parameters=[{
-                'image_size': [640, 480],
+                'camera': 0, 'width': 640, 'height': 480,
                 'camera_frame_id': 'camera_link',
                 'camera_info_url': LaunchConfiguration('intrinsic_params_file'),
             }],

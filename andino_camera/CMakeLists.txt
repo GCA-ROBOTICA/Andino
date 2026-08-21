@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.18)
-project(camera_ros)
+project(andino_camera)
 
 set(CMAKE_CXX_STANDARD 20)
 
