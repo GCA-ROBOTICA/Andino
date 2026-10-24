@@ -29,6 +29,18 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "app.h"
 
+#if defined(ESP32)
+
+void setup() {
+  andino::App::setup();
+}
+
+void loop() {
+  andino::App::loop();
+}
+
+#else
+
 /// @brief Application entry point.
 ///
 /// @return Execution final status (never reached).
@@ -43,3 +55,5 @@ int main(void) {
 
   return 0;
 }
+
+#endif

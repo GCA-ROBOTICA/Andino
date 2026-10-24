@@ -89,26 +89,30 @@ SerialStreamArduino App::serial_stream_;
 Shell App::shell_;
 
 DigitalOutArduino App::left_motor_enable_digital_out_(Hw::kLeftMotorEnableGpioPin);
-PwmOutArduino App::left_motor_forward_pwm_out_(Hw::kLeftMotorForwardGpioPin);
-PwmOutArduino App::left_motor_backward_pwm_out_(Hw::kLeftMotorBackwardGpioPin);
-Motor App::left_motor_(&left_motor_enable_digital_out_, &left_motor_forward_pwm_out_,
-                       &left_motor_backward_pwm_out_);
+DigitalOutArduino App::left_motor_dir_digital_out_(Hw::kLeftMotorDirGpioPin);
+PwmOutArduino App::left_motor_pwm_out_(Hw::kLeftMotorPwmGpioPin);
+Motor App::left_motor_(&left_motor_enable_digital_out_, &left_motor_dir_digital_out_,
+                       &left_motor_pwm_out_);
 
 DigitalOutArduino App::right_motor_enable_digital_out_(Hw::kRightMotorEnableGpioPin);
-PwmOutArduino App::right_motor_forward_pwm_out_(Hw::kRightMotorForwardGpioPin);
-PwmOutArduino App::right_motor_backward_pwm_out_(Hw::kRightMotorBackwardGpioPin);
-Motor App::right_motor_(&right_motor_enable_digital_out_, &right_motor_forward_pwm_out_,
-                        &right_motor_backward_pwm_out_);
+DigitalOutArduino App::right_motor_dir_digital_out_(Hw::kRightMotorDirGpioPin);
+PwmOutArduino App::right_motor_pwm_out_(Hw::kRightMotorPwmGpioPin);
+Motor App::right_motor_(&right_motor_enable_digital_out_, &right_motor_dir_digital_out_,
+                        &right_motor_pwm_out_);
 
-InterruptInArduino App::left_encoder_channel_a_interrupt_in_(Hw::kLeftEncoderChannelAGpioPin);
-InterruptInArduino App::left_encoder_channel_b_interrupt_in_(Hw::kLeftEncoderChannelBGpioPin);
-Encoder App::left_encoder_(&left_encoder_channel_a_interrupt_in_,
-                           &left_encoder_channel_b_interrupt_in_);
+InterruptInArduino App::left_encoder_channel_u_interrupt_in_(Hw::kLeftEncoderChannelUGpioPin);
+InterruptInArduino App::left_encoder_channel_v_interrupt_in_(Hw::kLeftEncoderChannelVGpioPin);
+InterruptInArduino App::left_encoder_channel_w_interrupt_in_(Hw::kLeftEncoderChannelWGpioPin);
+Encoder App::left_encoder_(&left_encoder_channel_u_interrupt_in_,
+                           &left_encoder_channel_v_interrupt_in_,
+                           &left_encoder_channel_w_interrupt_in_);
 
-InterruptInArduino App::right_encoder_channel_a_interrupt_in_(Hw::kRightEncoderChannelAGpioPin);
-InterruptInArduino App::right_encoder_channel_b_interrupt_in_(Hw::kRightEncoderChannelBGpioPin);
-Encoder App::right_encoder_(&right_encoder_channel_a_interrupt_in_,
-                            &right_encoder_channel_b_interrupt_in_);
+InterruptInArduino App::right_encoder_channel_u_interrupt_in_(Hw::kRightEncoderChannelUGpioPin);
+InterruptInArduino App::right_encoder_channel_v_interrupt_in_(Hw::kRightEncoderChannelVGpioPin);
+InterruptInArduino App::right_encoder_channel_w_interrupt_in_(Hw::kRightEncoderChannelWGpioPin);
+Encoder App::right_encoder_(&right_encoder_channel_u_interrupt_in_,
+                            &right_encoder_channel_v_interrupt_in_,
+                            &right_encoder_channel_w_interrupt_in_);
 
 Pid App::left_pid_controller_(Constants::kPidKp, Constants::kPidKd, Constants::kPidKi,
                               Constants::kPidKo, -Constants::kPwmMax, Constants::kPwmMax);
@@ -124,8 +128,10 @@ bool App::is_imu_connected{false};
 Adafruit_BNO055 App::bno055_imu_{/*sensorID=*/55, BNO055_ADDRESS_A, &Wire};
 
 void App::setup() {
-  // Required by Arduino libraries to work.
+#if defined(__AVR__)
+  // Required by Arduino AVR libraries to work.
   init();
+#endif
 
   serial_stream_.begin(Constants::kBaudrate);
 
@@ -153,10 +159,24 @@ void App::setup() {
   shell_.register_command(Commands::kGetIsImuConnected, cmd_get_is_imu_connected_cb);
   shell_.register_command(Commands::kReadEncodersAndImu, cmd_read_encoders_and_imu_cb);
 
-  // Initialize IMU sensor.
-  if (bno055_imu_.begin()) {
-    bno055_imu_.setExtCrystalUse(true);
-    is_imu_connected = true;
+  // Initialize I2C bus with configured pins and a short timeout.
+#if defined(ESP32)
+  Wire.begin(Hw::kImuI2cSdaPin, Hw::kImuI2cSclPin);
+  Wire.setTimeOut(50);
+#else
+  Wire.begin();
+#endif
+
+  // Fast probe: check if an I2C device acknowledges at the BNO055 address.
+  // This avoids multi-second blocking/freezing if no IMU is physically connected.
+  Wire.beginTransmission(BNO055_ADDRESS_A);
+  if (Wire.endTransmission() == 0) {
+    if (bno055_imu_.begin()) {
+      bno055_imu_.setExtCrystalUse(true);
+      is_imu_connected = true;
+    }
+  } else {
+    is_imu_connected = false;
   }
 }
 
@@ -176,10 +196,12 @@ void App::loop() {
     stop_motors();
   }
 
+#if defined(__AVR__)
   // Required by Arduino libraries to work.
   if (serialEventRun) {
     serialEventRun();
   }
+#endif
 }
 
 void App::adjust_motors_speed() {
@@ -327,39 +349,41 @@ void App::cmd_read_encoders_and_imu_cb(int, char**) {
   Serial.print(right_encoder_.read());
   Serial.print(" ");
 
-  // Retrieve absolute orientation (quaternion). See
-  // https://learn.adafruit.com/adafruit-bno055-absolute-orientation-sensor/overview for further
-  // information.
-  imu::Quaternion orientation = bno055_imu_.getQuat();
-  Serial.print(orientation.x(), 4);
-  Serial.print(" ");
-  Serial.print(orientation.y(), 4);
-  Serial.print(" ");
-  Serial.print(orientation.z(), 4);
-  Serial.print(" ");
-  Serial.print(orientation.w(), 4);
-  Serial.print(" ");
+  if (is_imu_connected) {
+    // Retrieve absolute orientation (quaternion). See
+    // https://learn.adafruit.com/adafruit-bno055-absolute-orientation-sensor/overview for further
+    // information.
+    imu::Quaternion orientation = bno055_imu_.getQuat();
+    Serial.print(orientation.x(), 4);
+    Serial.print(" ");
+    Serial.print(orientation.y(), 4);
+    Serial.print(" ");
+    Serial.print(orientation.z(), 4);
+    Serial.print(" ");
+    Serial.print(orientation.w(), 4);
+    Serial.print(" ");
 
-  // Retrieve angular velocity (rad/s). See
-  // https://learn.adafruit.com/adafruit-bno055-absolute-orientation-sensor/overview for further
-  // information.
-  imu::Vector<3> angular_velocity = bno055_imu_.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);
-  Serial.print(angular_velocity.x());
-  Serial.print(" ");
-  Serial.print(angular_velocity.y());
-  Serial.print(" ");
-  Serial.print(angular_velocity.z());
-  Serial.print(" ");
+    // Retrieve angular velocity (rad/s).
+    imu::Vector<3> angular_velocity = bno055_imu_.getVector(Adafruit_BNO055::VECTOR_GYROSCOPE);
+    Serial.print(angular_velocity.x());
+    Serial.print(" ");
+    Serial.print(angular_velocity.y());
+    Serial.print(" ");
+    Serial.print(angular_velocity.z());
+    Serial.print(" ");
 
-  // Retrieve linear acceleration (m/s^2). See
-  // https://learn.adafruit.com/adafruit-bno055-absolute-orientation-sensor/overview for further
-  // information.
-  imu::Vector<3> linear_acceleration = bno055_imu_.getVector(Adafruit_BNO055::VECTOR_LINEARACCEL);
-  Serial.print(linear_acceleration.x());
-  Serial.print(" ");
-  Serial.print(linear_acceleration.y());
-  Serial.print(" ");
-  Serial.print(linear_acceleration.z());
+    // Retrieve linear acceleration (m/s^2).
+    imu::Vector<3> linear_acceleration = bno055_imu_.getVector(Adafruit_BNO055::VECTOR_LINEARACCEL);
+    Serial.print(linear_acceleration.x());
+    Serial.print(" ");
+    Serial.print(linear_acceleration.y());
+    Serial.print(" ");
+    Serial.println(linear_acceleration.z());
+  } else {
+    // If IMU is disconnected, output identity quaternion and zero rates/accelerations
+    // followed by newline so serial readers (ROS node) don't hang or time out.
+    Serial.println("0.0000 0.0000 0.0000 1.0000 0.0 0.0 0.0 0.0 0.0 0.0");
+  }
 }
 
 }  // namespace andino

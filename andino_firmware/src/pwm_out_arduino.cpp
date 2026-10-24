@@ -33,7 +33,14 @@
 
 namespace andino {
 
-void PwmOutArduino::begin() const { pinMode(gpio_pin_, OUTPUT); }
+void PwmOutArduino::begin() const {
+  pinMode(gpio_pin_, OUTPUT);
+#if defined(ESP32)
+  // Configure 20 kHz ultrasonic PWM frequency for smooth and silent BLDC driving.
+  analogWriteFrequency(20000);
+  analogWriteResolution(8);
+#endif
+}
 
 void PwmOutArduino::write(int value) const { analogWrite(gpio_pin_, value); }
 

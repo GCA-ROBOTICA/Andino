@@ -96,10 +96,17 @@ void Encoder::begin() {
     return;
   }
 
-  channel_a_interrupt_in_->begin();
-  channel_a_interrupt_in_->attach(kCallbacks[instance_count_]);
-  channel_b_interrupt_in_->begin();
-  channel_b_interrupt_in_->attach(kCallbacks[instance_count_]);
+  channel_u_interrupt_in_->begin();
+  channel_u_interrupt_in_->attach(kCallbacks[instance_count_]);
+  channel_v_interrupt_in_->begin();
+  channel_v_interrupt_in_->attach(kCallbacks[instance_count_]);
+  channel_w_interrupt_in_->begin();
+  channel_w_interrupt_in_->attach(kCallbacks[instance_count_]);
+
+  // Read initial 3-phase Hall state.
+  state_ = static_cast<uint8_t>((channel_u_interrupt_in_->read() << 2) |
+                                (channel_v_interrupt_in_->read() << 1) |
+                                channel_w_interrupt_in_->read());
 
   instances_[instance_count_] = this;
   instance_count_++;
@@ -110,12 +117,17 @@ long Encoder::read() { return count_; }
 void Encoder::reset() { count_ = 0L; }
 
 void Encoder::callback() {
-  // Read the current channels state into the lowest 2 bits of the encoder state.
-  state_ <<= 2;
-  state_ |= (channel_b_interrupt_in_->read() << 1) | channel_a_interrupt_in_->read();
+  // Read current Hall state: bit 2 = U, bit 1 = V, bit 0 = W.
+  const uint8_t new_state = static_cast<uint8_t>((channel_u_interrupt_in_->read() << 2) |
+                                                 (channel_v_interrupt_in_->read() << 1) |
+                                                 channel_w_interrupt_in_->read());
 
-  // Update the encoder count accordingly.
-  count_ += kTicksDelta[(state_ & 0x0F)];
+  // Form 6-bit index from previous 3 bits and current 3 bits.
+  const uint8_t index = static_cast<uint8_t>(((state_ & 0x07) << 3) | (new_state & 0x07));
+
+  // Update ticks count based on transition lookup table.
+  count_ += kTicksDelta[index];
+  state_ = new_state;
 }
 
 }  // namespace andino

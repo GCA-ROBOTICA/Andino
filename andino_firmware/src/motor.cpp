@@ -71,8 +71,8 @@ namespace andino {
 
 void Motor::begin() {
   enable_digital_out_->begin();
-  forward_pwm_out_->begin();
-  backward_pwm_out_->begin();
+  direction_digital_out_->begin();
+  speed_pwm_out_->begin();
 }
 
 void Motor::enable(bool enabled) { enable_digital_out_->write(enabled ? 1 : 0); }
@@ -88,14 +88,11 @@ void Motor::set_speed(int speed) {
     speed = kMaxSpeed;
   }
 
-  // The motor speed is controlled by sending a PWM wave to the corresponding pin.
-  if (forward) {
-    forward_pwm_out_->write(speed);
-    backward_pwm_out_->write(0);
-  } else {
-    backward_pwm_out_->write(speed);
-    forward_pwm_out_->write(0);
-  }
+  // The motor direction is controlled by the direction digital output pin.
+  direction_digital_out_->write(forward ? 1 : 0);
+
+  // The motor speed is controlled by the PWM wave duty cycle.
+  speed_pwm_out_->write(speed);
 }
 
 }  // namespace andino

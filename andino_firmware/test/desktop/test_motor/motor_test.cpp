@@ -56,70 +56,70 @@ class MockPwmOut : public andino::PwmOut {
 class MotorTest : public testing::Test {
  protected:
   MockDigitalOut enable_digital_out_{0};
-  MockPwmOut forward_pwm_out_{0};
-  MockPwmOut backward_pwm_out_{0};
+  MockDigitalOut direction_digital_out_{0};
+  MockPwmOut speed_pwm_out_{0};
 };
 
 TEST_F(MotorTest, Initialize) {
   EXPECT_CALL(enable_digital_out_, begin()).Times(1);
-  EXPECT_CALL(forward_pwm_out_, begin()).Times(1);
-  EXPECT_CALL(backward_pwm_out_, begin()).Times(1);
+  EXPECT_CALL(direction_digital_out_, begin()).Times(1);
+  EXPECT_CALL(speed_pwm_out_, begin()).Times(1);
 
-  andino::Motor motor(&enable_digital_out_, &forward_pwm_out_, &backward_pwm_out_);
+  andino::Motor motor(&enable_digital_out_, &direction_digital_out_, &speed_pwm_out_);
   motor.begin();
 }
 
 TEST_F(MotorTest, Enable) {
   EXPECT_CALL(enable_digital_out_, write(1)).Times(1);
 
-  andino::Motor motor(&enable_digital_out_, &forward_pwm_out_, &backward_pwm_out_);
+  andino::Motor motor(&enable_digital_out_, &direction_digital_out_, &speed_pwm_out_);
   motor.enable(true);
 }
 
 TEST_F(MotorTest, Disable) {
   EXPECT_CALL(enable_digital_out_, write(0)).Times(1);
 
-  andino::Motor motor(&enable_digital_out_, &forward_pwm_out_, &backward_pwm_out_);
+  andino::Motor motor(&enable_digital_out_, &direction_digital_out_, &speed_pwm_out_);
   motor.enable(false);
 }
 
 TEST_F(MotorTest, SetPositiveSpeed) {
-  EXPECT_CALL(forward_pwm_out_, write(100)).Times(1);
-  EXPECT_CALL(backward_pwm_out_, write(0)).Times(1);
+  EXPECT_CALL(direction_digital_out_, write(1)).Times(1);
+  EXPECT_CALL(speed_pwm_out_, write(100)).Times(1);
 
-  andino::Motor motor(&enable_digital_out_, &forward_pwm_out_, &backward_pwm_out_);
+  andino::Motor motor(&enable_digital_out_, &direction_digital_out_, &speed_pwm_out_);
   motor.set_speed(100);
 }
 
 TEST_F(MotorTest, SetNegativeSpeed) {
-  EXPECT_CALL(forward_pwm_out_, write(0)).Times(1);
-  EXPECT_CALL(backward_pwm_out_, write(100)).Times(1);
+  EXPECT_CALL(direction_digital_out_, write(0)).Times(1);
+  EXPECT_CALL(speed_pwm_out_, write(100)).Times(1);
 
-  andino::Motor motor(&enable_digital_out_, &forward_pwm_out_, &backward_pwm_out_);
+  andino::Motor motor(&enable_digital_out_, &direction_digital_out_, &speed_pwm_out_);
   motor.set_speed(-100);
 }
 
 TEST_F(MotorTest, SetZeroSpeed) {
-  EXPECT_CALL(forward_pwm_out_, write(0)).Times(1);
-  EXPECT_CALL(backward_pwm_out_, write(0)).Times(1);
+  EXPECT_CALL(direction_digital_out_, write(1)).Times(1);
+  EXPECT_CALL(speed_pwm_out_, write(0)).Times(1);
 
-  andino::Motor motor(&enable_digital_out_, &forward_pwm_out_, &backward_pwm_out_);
+  andino::Motor motor(&enable_digital_out_, &direction_digital_out_, &speed_pwm_out_);
   motor.set_speed(0);
 }
 
 TEST_F(MotorTest, SetHigherThanMaximumPositiveSpeed) {
-  EXPECT_CALL(forward_pwm_out_, write(255)).Times(1);
-  EXPECT_CALL(backward_pwm_out_, write(0)).Times(1);
+  EXPECT_CALL(direction_digital_out_, write(1)).Times(1);
+  EXPECT_CALL(speed_pwm_out_, write(255)).Times(1);
 
-  andino::Motor motor(&enable_digital_out_, &forward_pwm_out_, &backward_pwm_out_);
+  andino::Motor motor(&enable_digital_out_, &direction_digital_out_, &speed_pwm_out_);
   motor.set_speed(500);
 }
 
 TEST_F(MotorTest, SetLowerThanMinimumNegativeSpeed) {
-  EXPECT_CALL(forward_pwm_out_, write(0)).Times(1);
-  EXPECT_CALL(backward_pwm_out_, write(255)).Times(1);
+  EXPECT_CALL(direction_digital_out_, write(0)).Times(1);
+  EXPECT_CALL(speed_pwm_out_, write(255)).Times(1);
 
-  andino::Motor motor(&enable_digital_out_, &forward_pwm_out_, &backward_pwm_out_);
+  andino::Motor motor(&enable_digital_out_, &direction_digital_out_, &speed_pwm_out_);
   motor.set_speed(-500);
 }
 

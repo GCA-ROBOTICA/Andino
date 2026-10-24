@@ -51,101 +51,221 @@ class MockInterruptIn : public andino::InterruptIn {
 
 class EncoderTest : public testing::Test {
  protected:
-  MockInterruptIn channel_a_interrupt_in_{0};
-  MockInterruptIn channel_b_interrupt_in_{0};
-  andino::Encoder encoder_{&channel_a_interrupt_in_, &channel_b_interrupt_in_};
+  MockInterruptIn channel_u_interrupt_in_{0};
+  MockInterruptIn channel_v_interrupt_in_{0};
+  MockInterruptIn channel_w_interrupt_in_{0};
+  andino::Encoder encoder_{&channel_u_interrupt_in_, &channel_v_interrupt_in_,
+                           &channel_w_interrupt_in_};
 };
 
-static andino::InterruptIn::InterruptCallback channel_a_callback_{nullptr};
-static andino::InterruptIn::InterruptCallback channel_b_callback_{nullptr};
+static andino::InterruptIn::InterruptCallback channel_u_callback_{nullptr};
+static andino::InterruptIn::InterruptCallback channel_v_callback_{nullptr};
+static andino::InterruptIn::InterruptCallback channel_w_callback_{nullptr};
 
 TEST_F(EncoderTest, Initialize) {
-  EXPECT_CALL(channel_a_interrupt_in_, begin()).Times(1);
-  EXPECT_CALL(channel_b_interrupt_in_, begin()).Times(1);
-  EXPECT_CALL(channel_a_interrupt_in_, attach(_))
+  EXPECT_CALL(channel_u_interrupt_in_, begin()).Times(1);
+  EXPECT_CALL(channel_v_interrupt_in_, begin()).Times(1);
+  EXPECT_CALL(channel_w_interrupt_in_, begin()).Times(1);
+  EXPECT_CALL(channel_u_interrupt_in_, attach(_))
       .Times(1)
-      .WillOnce(::testing::SaveArg<0>(&channel_a_callback_));
-  EXPECT_CALL(channel_b_interrupt_in_, attach(_))
+      .WillOnce(::testing::SaveArg<0>(&channel_u_callback_));
+  EXPECT_CALL(channel_v_interrupt_in_, attach(_))
       .Times(1)
-      .WillOnce(::testing::SaveArg<0>(&channel_b_callback_));
+      .WillOnce(::testing::SaveArg<0>(&channel_v_callback_));
+  EXPECT_CALL(channel_w_interrupt_in_, attach(_))
+      .Times(1)
+      .WillOnce(::testing::SaveArg<0>(&channel_w_callback_));
+
+  // Initial read when begin() is called (U=1, V=0, W=0 -> state 4).
+  EXPECT_CALL(channel_u_interrupt_in_, read()).Times(1).WillOnce(Return(1));
+  EXPECT_CALL(channel_v_interrupt_in_, read()).Times(1).WillOnce(Return(0));
+  EXPECT_CALL(channel_w_interrupt_in_, read()).Times(1).WillOnce(Return(0));
 
   encoder_.begin();
 
-  // Current implementation requires both channels to call the same callback function.
-  EXPECT_NE(channel_a_callback_, nullptr);
-  EXPECT_NE(channel_b_callback_, nullptr);
-  EXPECT_EQ(channel_a_callback_, channel_b_callback_);
+  EXPECT_NE(channel_u_callback_, nullptr);
+  EXPECT_NE(channel_v_callback_, nullptr);
+  EXPECT_NE(channel_w_callback_, nullptr);
+  EXPECT_EQ(channel_u_callback_, channel_v_callback_);
+  EXPECT_EQ(channel_v_callback_, channel_w_callback_);
 }
 
 TEST_F(EncoderTest, ReadIncreasingTicksCount) {
-  EXPECT_CALL(channel_a_interrupt_in_, read())
-      .Times(4)
-      .WillOnce(Return(0))
-      .WillOnce(Return(1))
-      .WillOnce(Return(1))
-      .WillOnce(Return(0));
-  EXPECT_CALL(channel_b_interrupt_in_, read())
-      .Times(4)
-      .WillOnce(Return(0))
-      .WillOnce(Return(0))
-      .WillOnce(Return(1))
-      .WillOnce(Return(1));
+  // begin() initial read: State 4 (100)
+  EXPECT_CALL(channel_u_interrupt_in_, read())
+      .Times(7)
+      .WillOnce(Return(1))  // begin(): state 4 (100)
+      .WillOnce(Return(1))  // step 1: state 6 (110)
+      .WillOnce(Return(0))  // step 2: state 2 (010)
+      .WillOnce(Return(0))  // step 3: state 3 (011)
+      .WillOnce(Return(0))  // step 4: state 1 (001)
+      .WillOnce(Return(1))  // step 5: state 5 (101)
+      .WillOnce(Return(1)); // step 6: state 4 (100)
 
+  EXPECT_CALL(channel_v_interrupt_in_, read())
+      .Times(7)
+      .WillOnce(Return(0))  // begin()
+      .WillOnce(Return(1))  // step 1
+      .WillOnce(Return(1))  // step 2
+      .WillOnce(Return(1))  // step 3
+      .WillOnce(Return(0))  // step 4
+      .WillOnce(Return(0))  // step 5
+      .WillOnce(Return(0)); // step 6
+
+  EXPECT_CALL(channel_w_interrupt_in_, read())
+      .Times(7)
+      .WillOnce(Return(0))  // begin()
+      .WillOnce(Return(0))  // step 1
+      .WillOnce(Return(0))  // step 2
+      .WillOnce(Return(1))  // step 3
+      .WillOnce(Return(1))  // step 4
+      .WillOnce(Return(1))  // step 5
+      .WillOnce(Return(0)); // step 6
+
+  EXPECT_CALL(channel_u_interrupt_in_, begin()).Times(1);
+  EXPECT_CALL(channel_v_interrupt_in_, begin()).Times(1);
+  EXPECT_CALL(channel_w_interrupt_in_, begin()).Times(1);
+  EXPECT_CALL(channel_u_interrupt_in_, attach(_))
+      .Times(1)
+      .WillOnce(::testing::SaveArg<0>(&channel_u_callback_));
+  EXPECT_CALL(channel_v_interrupt_in_, attach(_)).Times(1);
+  EXPECT_CALL(channel_w_interrupt_in_, attach(_)).Times(1);
+
+  encoder_.begin();
   EXPECT_EQ(encoder_.read(), 0);
-  channel_a_callback_();
-  EXPECT_EQ(encoder_.read(), 0);
-  channel_a_callback_();
+
+  // 4 -> 6 (+1)
+  channel_u_callback_();
   EXPECT_EQ(encoder_.read(), 1);
-  channel_a_callback_();
+
+  // 6 -> 2 (+1)
+  channel_u_callback_();
   EXPECT_EQ(encoder_.read(), 2);
-  channel_a_callback_();
+
+  // 2 -> 3 (+1)
+  channel_u_callback_();
   EXPECT_EQ(encoder_.read(), 3);
+
+  // 3 -> 1 (+1)
+  channel_u_callback_();
+  EXPECT_EQ(encoder_.read(), 4);
+
+  // 1 -> 5 (+1)
+  channel_u_callback_();
+  EXPECT_EQ(encoder_.read(), 5);
+
+  // 5 -> 4 (+1)
+  channel_u_callback_();
+  EXPECT_EQ(encoder_.read(), 6);
 }
 
 TEST_F(EncoderTest, ReadDecreasingTicksCount) {
-  EXPECT_CALL(channel_a_interrupt_in_, read())
-      .Times(4)
-      .WillOnce(Return(0))
-      .WillOnce(Return(0))
-      .WillOnce(Return(1))
-      .WillOnce(Return(1));
-  EXPECT_CALL(channel_b_interrupt_in_, read())
-      .Times(4)
-      .WillOnce(Return(0))
-      .WillOnce(Return(1))
-      .WillOnce(Return(1))
-      .WillOnce(Return(0));
+  // begin() initial read: State 4 (100)
+  // Backward sequence: 4 -> 5 -> 1 -> 3 -> 2 -> 6 -> 4
+  EXPECT_CALL(channel_u_interrupt_in_, read())
+      .Times(7)
+      .WillOnce(Return(1))  // begin(): state 4 (100)
+      .WillOnce(Return(1))  // step 1: state 5 (101)
+      .WillOnce(Return(0))  // step 2: state 1 (001)
+      .WillOnce(Return(0))  // step 3: state 3 (011)
+      .WillOnce(Return(0))  // step 4: state 2 (010)
+      .WillOnce(Return(1))  // step 5: state 6 (110)
+      .WillOnce(Return(1)); // step 6: state 4 (100)
 
+  EXPECT_CALL(channel_v_interrupt_in_, read())
+      .Times(7)
+      .WillOnce(Return(0))  // begin()
+      .WillOnce(Return(0))  // step 1
+      .WillOnce(Return(0))  // step 2
+      .WillOnce(Return(1))  // step 3
+      .WillOnce(Return(1))  // step 4
+      .WillOnce(Return(1))  // step 5
+      .WillOnce(Return(0)); // step 6
+
+  EXPECT_CALL(channel_w_interrupt_in_, read())
+      .Times(7)
+      .WillOnce(Return(0))  // begin()
+      .WillOnce(Return(1))  // step 1
+      .WillOnce(Return(1))  // step 2
+      .WillOnce(Return(1))  // step 3
+      .WillOnce(Return(0))  // step 4
+      .WillOnce(Return(0))  // step 5
+      .WillOnce(Return(0)); // step 6
+
+  EXPECT_CALL(channel_u_interrupt_in_, begin()).Times(1);
+  EXPECT_CALL(channel_v_interrupt_in_, begin()).Times(1);
+  EXPECT_CALL(channel_w_interrupt_in_, begin()).Times(1);
+  EXPECT_CALL(channel_u_interrupt_in_, attach(_))
+      .Times(1)
+      .WillOnce(::testing::SaveArg<0>(&channel_u_callback_));
+  EXPECT_CALL(channel_v_interrupt_in_, attach(_)).Times(1);
+  EXPECT_CALL(channel_w_interrupt_in_, attach(_)).Times(1);
+
+  encoder_.begin();
   EXPECT_EQ(encoder_.read(), 0);
-  channel_a_callback_();
-  EXPECT_EQ(encoder_.read(), 0);
-  channel_a_callback_();
+
+  // 4 -> 5 (-1)
+  channel_u_callback_();
   EXPECT_EQ(encoder_.read(), -1);
-  channel_a_callback_();
+
+  // 5 -> 1 (-1)
+  channel_u_callback_();
   EXPECT_EQ(encoder_.read(), -2);
-  channel_a_callback_();
+
+  // 1 -> 3 (-1)
+  channel_u_callback_();
   EXPECT_EQ(encoder_.read(), -3);
+
+  // 3 -> 2 (-1)
+  channel_u_callback_();
+  EXPECT_EQ(encoder_.read(), -4);
+
+  // 2 -> 6 (-1)
+  channel_u_callback_();
+  EXPECT_EQ(encoder_.read(), -5);
+
+  // 6 -> 4 (-1)
+  channel_u_callback_();
+  EXPECT_EQ(encoder_.read(), -6);
 }
 
 TEST_F(EncoderTest, ResetTicksCount) {
-  EXPECT_CALL(channel_a_interrupt_in_, read())
+  EXPECT_CALL(channel_u_interrupt_in_, read())
+      .Times(3)
+      .WillOnce(Return(1))  // begin(): state 4
+      .WillOnce(Return(1))  // step 1: state 6
+      .WillOnce(Return(0)); // step 2: state 2
+
+  EXPECT_CALL(channel_v_interrupt_in_, read())
       .Times(3)
       .WillOnce(Return(0))
       .WillOnce(Return(1))
       .WillOnce(Return(1));
-  EXPECT_CALL(channel_b_interrupt_in_, read())
+
+  EXPECT_CALL(channel_w_interrupt_in_, read())
       .Times(3)
       .WillOnce(Return(0))
       .WillOnce(Return(0))
-      .WillOnce(Return(1));
+      .WillOnce(Return(0));
 
+  EXPECT_CALL(channel_u_interrupt_in_, begin()).Times(1);
+  EXPECT_CALL(channel_v_interrupt_in_, begin()).Times(1);
+  EXPECT_CALL(channel_w_interrupt_in_, begin()).Times(1);
+  EXPECT_CALL(channel_u_interrupt_in_, attach(_))
+      .Times(1)
+      .WillOnce(::testing::SaveArg<0>(&channel_u_callback_));
+  EXPECT_CALL(channel_v_interrupt_in_, attach(_)).Times(1);
+  EXPECT_CALL(channel_w_interrupt_in_, attach(_)).Times(1);
+
+  encoder_.begin();
   EXPECT_EQ(encoder_.read(), 0);
-  channel_a_callback_();
-  EXPECT_EQ(encoder_.read(), 0);
-  channel_a_callback_();
+
+  channel_u_callback_();
   EXPECT_EQ(encoder_.read(), 1);
-  channel_a_callback_();
+
+  channel_u_callback_();
   EXPECT_EQ(encoder_.read(), 2);
+
   encoder_.reset();
   EXPECT_EQ(encoder_.read(), 0);
 }

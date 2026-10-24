@@ -31,6 +31,29 @@
 
 #include <Arduino.h>
 
+#if defined(ESP32)
+
+namespace andino {
+
+void InterruptInArduino::begin() const {
+  // GPIO 34 to 39 are input-only without internal pull-ups on ESP32.
+  if (gpio_pin_ >= 34 && gpio_pin_ <= 39) {
+    pinMode(gpio_pin_, INPUT);
+  } else {
+    pinMode(gpio_pin_, INPUT_PULLUP);
+  }
+}
+
+int InterruptInArduino::read() const { return digitalRead(gpio_pin_); }
+
+void InterruptInArduino::attach(InterruptCallback callback) const {
+  attachInterrupt(digitalPinToInterrupt(gpio_pin_), callback, CHANGE);
+}
+
+}  // namespace andino
+
+#elif defined(__AVR__)
+
 /// Holds the attached callbacks.
 static andino::InterruptIn::InterruptCallback g_callbacks[3] = {nullptr};
 
@@ -86,3 +109,19 @@ void InterruptInArduino::attach(InterruptCallback callback) const {
 }
 
 }  // namespace andino
+
+#else
+
+namespace andino {
+
+void InterruptInArduino::begin() const { pinMode(gpio_pin_, INPUT_PULLUP); }
+
+int InterruptInArduino::read() const { return digitalRead(gpio_pin_); }
+
+void InterruptInArduino::attach(InterruptCallback callback) const {
+  attachInterrupt(digitalPinToInterrupt(gpio_pin_), callback, CHANGE);
+}
+
+}  // namespace andino
+
+#endif

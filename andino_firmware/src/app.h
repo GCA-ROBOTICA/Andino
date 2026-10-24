@@ -99,24 +99,26 @@ class App {
 
   /// Left wheel motor.
   static DigitalOutArduino left_motor_enable_digital_out_;
-  static PwmOutArduino left_motor_forward_pwm_out_;
-  static PwmOutArduino left_motor_backward_pwm_out_;
+  static DigitalOutArduino left_motor_dir_digital_out_;
+  static PwmOutArduino left_motor_pwm_out_;
   static Motor left_motor_;
 
   /// Right wheel motor.
   static DigitalOutArduino right_motor_enable_digital_out_;
-  static PwmOutArduino right_motor_forward_pwm_out_;
-  static PwmOutArduino right_motor_backward_pwm_out_;
+  static DigitalOutArduino right_motor_dir_digital_out_;
+  static PwmOutArduino right_motor_pwm_out_;
   static Motor right_motor_;
 
   /// Left wheel encoder.
-  static InterruptInArduino left_encoder_channel_a_interrupt_in_;
-  static InterruptInArduino left_encoder_channel_b_interrupt_in_;
+  static InterruptInArduino left_encoder_channel_u_interrupt_in_;
+  static InterruptInArduino left_encoder_channel_v_interrupt_in_;
+  static InterruptInArduino left_encoder_channel_w_interrupt_in_;
   static Encoder left_encoder_;
 
   /// Right wheel encoder.
-  static InterruptInArduino right_encoder_channel_a_interrupt_in_;
-  static InterruptInArduino right_encoder_channel_b_interrupt_in_;
+  static InterruptInArduino right_encoder_channel_u_interrupt_in_;
+  static InterruptInArduino right_encoder_channel_v_interrupt_in_;
+  static InterruptInArduino right_encoder_channel_w_interrupt_in_;
   static Encoder right_encoder_;
 
   /// PID controllers (one per wheel).
